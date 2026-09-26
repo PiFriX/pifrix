@@ -1,10 +1,12 @@
 import { config, collection, fields } from '@keystatic/core'
 
 export default config({
-  // 部署到 Vercel 且配置了 GitHub OAuth 后自动切换到 GitHub 模式（在线提交）；
-  // 本地开发（无 OAuth 凭证）时自动降级为 local 模式，直接读写本地文件
+  // 生产构建（服务器与客户端一致求值）使用 GitHub 模式（在线提交）；
+  // 本地开发自动降级为 local 模式，直接读写本地文件。
+  // 注意：不能用 KEYSTATIC_GITHUB_CLIENT_ID 判断——该变量在客户端包中不存在，
+  // 会导致客户端和服务端的 storage 模式不一致。
   storage:
-    process.env.KEYSTATIC_GITHUB_CLIENT_ID && process.env.KEYSTATIC_GITHUB_CLIENT_SECRET
+    process.env.NODE_ENV === 'production'
       ? { kind: 'github', repo: 'PiFriX/pifrix' }
       : { kind: 'local' },
   ui: {

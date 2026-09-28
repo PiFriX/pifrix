@@ -20,6 +20,9 @@ export default config({
       label: '博客文章',
       slugField: 'title',
       path: 'data/blog/*',
+      // 列表默认只显示文件名(slug)，追加这些列后可直接看到文章标题，
+      // 与博客前台显示保持一致（列名取字段的 label）。
+      columns: ['title', 'date', 'draft'],
       format: { contentField: 'content' },
       entryLayout: 'content',
       schema: {

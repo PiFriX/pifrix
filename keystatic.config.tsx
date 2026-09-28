@@ -11,13 +11,92 @@ export default config({
       : { kind: 'local' },
   ui: {
     brand: { name: 'PiFriX 内容后台' },
+    // 侧栏模仿公众号「内容管理」：草稿箱 / 素材库 / 发表记录
     navigation: {
-      内容: ['posts', 'authors'],
+      内容: ['drafts', 'media', 'posts'],
+      其他: ['authors'],
     },
   },
   collections: {
+    // ── 草稿箱 ────────────────────────────────────────────────
+    // 写新文章从这里开始，文件存到 data/drafts/（contentlayer 不扫描该目录，
+    // 草稿不会出现在博客前台）。发布方式：在「发表记录」里新建同名文章，
+    // 把正文复制过去（Keystatic 不支持跨集合移动条目），再回草稿箱删除草稿。
+    drafts: collection({
+      label: '草稿箱',
+      slugField: 'title',
+      path: 'data/drafts/*',
+      columns: ['title'],
+      format: { contentField: 'content' },
+      entryLayout: 'content',
+      schema: {
+        title: fields.slug({
+          name: { label: '标题', validation: { isRequired: true } },
+          slug: { label: 'URL 路径（自动生成，可改）' },
+        }),
+        summary: fields.text({ label: '摘要', multiline: true }),
+        date: fields.date({ label: '发布日期' }),
+        tags: fields.array(fields.text({ label: '标签名' }), {
+          label: '标签',
+          itemLabel: (props) => props.value || '新标签',
+        }),
+        authors: fields.array(fields.text({ label: '作者 slug（对应 data/authors 下的文件名）' }), {
+          label: '作者',
+          itemLabel: (props) => props.value || '作者',
+        }),
+        images: fields.array(
+          fields.image({
+            label: '配图',
+            directory: 'public/static/images',
+            publicPath: '/static/images',
+          }),
+          {
+            label: '文章封面/配图',
+            itemLabel: (props) => props.value?.filename || '图片',
+          }
+        ),
+        content: fields.mdx({
+          label: '正文',
+          options: {
+            image: {
+              directory: 'public/static/images',
+              publicPath: '/static/images/',
+            },
+          },
+        }),
+      },
+    }),
+    // ── 素材库 ────────────────────────────────────────────────
+    // 每个条目 = 一份素材：图片存 public/static/images，视频等文件存
+    // public/static/media。点进条目可预览图片、查看/下载视频文件；
+    // 正文里引用时用编辑器图片按钮或粘贴对应 /static/... 路径。
+    media: collection({
+      label: '素材库',
+      slugField: 'name',
+      path: 'data/media/*',
+      format: { data: 'yaml' },
+      schema: {
+        name: fields.slug({
+          name: { label: '素材名称', validation: { isRequired: true } },
+          slug: { label: '文件标识（自动生成，可改）' },
+        }),
+        image: fields.image({
+          label: '图片素材',
+          directory: 'public/static/images',
+          publicPath: '/static/images',
+        }),
+        video: fields.file({
+          label: '视频/文件素材',
+          directory: 'public/static/media',
+          publicPath: '/static/media',
+        }),
+        note: fields.text({ label: '备注（用途说明）', multiline: true }),
+      },
+    }),
+    // ── 发表记录 ──────────────────────────────────────────────
+    // 已发布的文章（data/blog/），即博客前台实际渲染的内容。
     posts: collection({
-      label: '博客文章',
+      label: '发表记录',
       slugField: 'title',
       path: 'data/blog/*',
       // 列表默认只显示文件名(slug)，追加这些列后可直接看到文章标题，

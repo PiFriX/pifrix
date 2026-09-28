@@ -51,7 +51,19 @@ export default config({
             itemLabel: (props) => props.value?.filename || '图片',
           }
         ),
-        content: fields.mdx({ label: '正文' }),
+        // 正文图片统一存到 public/static/images（与博客其他图片一致）。
+        // 注意：options.image 只管理"本地路径"图片；正文里若写 https:// 外链图片，
+        // Keystatic 0.6.9 会误当作本地资源并生成错误删除路径，导致保存时报
+        // "[GraphQL] A path was requested for deletion..."（见 Thinkmill/keystatic#1625）。
+        content: fields.mdx({
+          label: '正文',
+          options: {
+            image: {
+              directory: 'public/static/images',
+              publicPath: '/static/images/',
+            },
+          },
+        }),
       },
     }),
     authors: collection({
@@ -75,7 +87,15 @@ export default config({
         linkedin: fields.text({ label: 'LinkedIn' }),
         github: fields.text({ label: 'GitHub' }),
         layout: fields.text({ label: '布局' }),
-        content: fields.mdx({ label: '个人简介' }),
+        content: fields.mdx({
+          label: '个人简介',
+          options: {
+            image: {
+              directory: 'public/static/images',
+              publicPath: '/static/images/',
+            },
+          },
+        }),
       },
     }),
   },

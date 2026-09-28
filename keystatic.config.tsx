@@ -30,31 +30,13 @@ export default config({
       format: { contentField: 'content' },
       entryLayout: 'content',
       schema: {
+        // 标题（含 URL 路径）是条目的文件名和唯一标识，Keystatic 必需，无法移除；
+        // 发布日期是博客构建必需字段（contentlayer required: true），也不能删。
         title: fields.slug({
           name: { label: '标题', validation: { isRequired: true } },
           slug: { label: 'URL 路径（自动生成，可改）' },
         }),
-        summary: fields.text({ label: '摘要', multiline: true }),
         date: fields.date({ label: '发布日期' }),
-        tags: fields.array(fields.text({ label: '标签名' }), {
-          label: '标签',
-          itemLabel: (props) => props.value || '新标签',
-        }),
-        authors: fields.array(fields.text({ label: '作者 slug（对应 data/authors 下的文件名）' }), {
-          label: '作者',
-          itemLabel: (props) => props.value || '作者',
-        }),
-        images: fields.array(
-          fields.image({
-            label: '配图',
-            directory: 'public/static/images',
-            publicPath: '/static/images',
-          }),
-          {
-            label: '文章封面/配图',
-            itemLabel: (props) => props.value?.filename || '图片',
-          }
-        ),
         content: fields.mdx({
           label: '正文',
           options: {
@@ -105,34 +87,16 @@ export default config({
       format: { contentField: 'content' },
       entryLayout: 'content',
       schema: {
+        // 精简表单：仅保留博客构建必需的 标题/发布日期，以及下架开关 草稿。
+        // 注意：Keystatic 保存时只写 schema 里的字段——从表单移除的 摘要/标签/
+        // 作者/最后修改日期/配图/布局，在该文章下次保存时会从前言中一并抹除
+        // （标签页、列表摘要等前台功能随之对这些文章失效，属预期取舍）。
         title: fields.slug({
           name: { label: '标题', validation: { isRequired: true } },
           slug: { label: 'URL 路径（自动生成，可改）' },
         }),
-        summary: fields.text({ label: '摘要', multiline: true }),
         date: fields.date({ label: '发布日期', validation: { isRequired: true } }),
-        lastmod: fields.date({ label: '最后修改日期' }),
-        tags: fields.array(fields.text({ label: '标签名' }), {
-          label: '标签',
-          itemLabel: (props) => props.value || '新标签',
-        }),
-        authors: fields.array(fields.text({ label: '作者 slug（对应 data/authors 下的文件名）' }), {
-          label: '作者',
-          itemLabel: (props) => props.value || '作者',
-        }),
-        draft: fields.checkbox({ label: '草稿（勾选后不显示在站点上）', defaultValue: false }),
-        layout: fields.text({ label: '布局（横幅文章用 PostBanner）' }),
-        images: fields.array(
-          fields.image({
-            label: '配图',
-            directory: 'public/static/images',
-            publicPath: '/static/images',
-          }),
-          {
-            label: '文章封面/配图',
-            itemLabel: (props) => props.value?.filename || '图片',
-          }
-        ),
+        draft: fields.checkbox({ label: '草稿（勾选后前台不显示）', defaultValue: false }),
         // 正文图片统一存到 public/static/images（与博客其他图片一致）。
         // 注意：options.image 只管理"本地路径"图片；正文里若写 https:// 外链图片，
         // Keystatic 0.6.9 会误当作本地资源并生成错误删除路径，导致保存时报

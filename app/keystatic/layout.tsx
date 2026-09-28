@@ -53,6 +53,16 @@ const hideSlugColumnScript = `(function () {
   schedule()
 })()`
 
+// 编辑器的下拉弹层（标题级别/字体样式、链接弹窗等）通过 React Portal 挂在
+// document.body 下，与本布局的全屏容器（z-index:50）不在同一层级；
+// 弹层默认 z-index 低于 50 时会被容器盖住，表现为"点击下拉没反应"。
+// 这里强制抬高层级，保证弹层始终显示在后台界面之上。
+const popupLayerStyle = `
+  [data-radix-popper-content-wrapper] { z-index: 999 !important; }
+  .mdxeditor-popup,
+  .mdxeditor [data-radix-popper-content-wrapper] { z-index: 999 !important; }
+`
+
 // Keystatic 后台布局：全屏容器盖住博客的页头页脚，后台独立呈现
 export default function KeystaticLayout() {
   return (
@@ -61,6 +71,7 @@ export default function KeystaticLayout() {
       style={{ position: 'fixed', inset: 0, zIndex: 50, overflow: 'auto', background: '#fff' }}
     >
       <script dangerouslySetInnerHTML={{ __html: hideSlugColumnScript }} />
+      <style dangerouslySetInnerHTML={{ __html: popupLayerStyle }} />
       <KeystaticApp />
     </div>
   )

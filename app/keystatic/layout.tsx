@@ -77,15 +77,70 @@ const hideSlugColumnScript = `(function () {
   schedule()
 })()`
 
-// 编辑器的下拉弹层（标题级别/字体样式、链接弹窗等）通过 React Portal 挂在
-// document.body 下，与本布局的全屏容器（z-index:50）不在同一层级；
-// 弹层默认 z-index 低于 50 时会被容器盖住，表现为"点击下拉没反应"。
-// 这里强制抬高层级，保证弹层始终显示在后台界面之上。
-const popupLayerStyle = `
-  [data-radix-popper-content-wrapper] { z-index: 999 !important; }
-  .mdxeditor-popup,
-  .mdxeditor [data-radix-popper-content-wrapper] { z-index: 999 !important; }
-`
+// Keystatic 的下拉弹层（Paragraph 切标题/字号、链接弹窗）和对话框（删除确认等）
+// 由 React Aria 传送到 document.body 下渲染，内联 z-index 只有 1~2，
+// 会被本布局的全屏容器（z-index:50）盖住 —— 表现为"下拉无法使用"、
+// "点删除后整个页面卡死"（其实是确认框被藏住 + 模态锁死了交互）。
+// 这里注入脚本：监测 body 直接子级里带低内联 z-index 的浮层容器，
+// 统一抬到 999，保证任何弹层都显示在全屏容器之上。
+// （之前用 [data-radix-popper-content-wrapper] 的 CSS 方案无效——Keystatic 不用 Radix。）
+const raiseOverlayScript = `(function () {
+  var ROOT_ID = 'ks-fullscreen-root'
+  var THRESHOLD = 50
+  // 判断一个元素是否是"低层级浮层"：fixed/absolute 且 z-index 在 0~49
+  function isLowOverlay(el) {
+    var cs = window.getComputedStyle(el)
+    var pos = cs.position
+    if (pos !== 'fixed' && pos !== 'absolute') return false
+    var z = parseInt(cs.zIndex, 10)
+    return !isNaN(z) && z >= 0 && z < THRESHOLD
+  }
+  // 传送门根节点（body 直接子级、static、内部带低层级浮层）：
+  // Keystatic 弹层的传送门根有 isolation:isolate（独立堆叠上下文）且 z-index auto，
+  // 内部弹层再高也会被本布局 z-50 容器整体盖住，必须把根节点本身抬上去。
+  // 设 position:relative + z-index:999（body 无滚动、无 margin，不影响弹层坐标）。
+  function raisePortalRoot(root) {
+    if (!root || root.nodeType !== 1 || !root.closest) return
+    if (root.closest('#' + ROOT_ID)) return
+    if (root.parentElement !== document.body) return
+    if (window.getComputedStyle(root).position !== 'static') return
+    var divs = root.querySelectorAll('div')
+    for (var i = 0; i < divs.length; i++) {
+      if (isLowOverlay(divs[i])) {
+        root.style.position = 'relative'
+        root.style.zIndex = '999'
+        return
+      }
+    }
+  }
+  // 兜底：浮层内部 z-index 写死在 class 里的（遮罩 1、弹层 2），逐个抬到 999
+  function bumpDescendants(root) {
+    if (!root || root.nodeType !== 1 || !root.closest) return
+    if (root.closest('#' + ROOT_ID)) return
+    var list = [root]
+    if (root.querySelectorAll) {
+      var subs = root.querySelectorAll('div')
+      for (var i = 0; i < subs.length; i++) list.push(subs[i])
+    }
+    for (var j = 0; j < list.length; j++) {
+      if (isLowOverlay(list[j])) list[j].style.zIndex = '999'
+    }
+  }
+  function handle(root) {
+    raisePortalRoot(root)
+    bumpDescendants(root)
+  }
+  if (window.__ksRaiseOverlayObserver) return
+  window.__ksRaiseOverlayObserver = new MutationObserver(function (records) {
+    for (var i = 0; i < records.length; i++) {
+      var added = records[i].addedNodes
+      for (var j = 0; j < added.length; j++) handle(added[j])
+    }
+  })
+  window.__ksRaiseOverlayObserver.observe(document.body, { childList: true, subtree: true })
+  var init = document.body.children
+  for (var k = 0; k < init.length; k++) handle(init[k])
+})()`
 
 // 草稿箱/发表记录的新建页与编辑页，把右侧整个表单面板隐藏（不是逐个隐藏字段——
 // 那样面板还占着位置，右侧留一大条空白）。正文编辑区随之占满全宽。
@@ -400,6 +455,7 @@ const draftToggleScript = `(function () {
 export default function KeystaticLayout() {
   return (
     <div
+      id="ks-fullscreen-root"
       className="fixed inset-0 z-50 overflow-auto bg-white"
       style={{ position: 'fixed', inset: 0, zIndex: 50, overflow: 'auto', background: '#fff' }}
     >
@@ -408,7 +464,7 @@ export default function KeystaticLayout() {
       <script dangerouslySetInnerHTML={{ __html: syncTitleScript }} />
       <script dangerouslySetInnerHTML={{ __html: publishButtonScript }} />
       <script dangerouslySetInnerHTML={{ __html: draftToggleScript }} />
-      <style dangerouslySetInnerHTML={{ __html: popupLayerStyle }} />
+      <script dangerouslySetInnerHTML={{ __html: raiseOverlayScript }} />
       <KeystaticApp />
     </div>
   )

@@ -31,12 +31,14 @@ export default config({
       entryLayout: 'content',
       schema: {
         // 标题（含 URL 路径）是条目的文件名和唯一标识，Keystatic 必需，无法移除；
-        // 发布日期是博客构建必需字段（contentlayer required: true），也不能删。
+        // 但编辑页会通过 layout 注入脚本隐藏显示，创建时填一次即可（发布时
+        // 正文第一行会作为真正的文章标题，这里的标题只是文件名）。
+        // 发布日期默认今天，隐藏显示，自动生成。
         title: fields.slug({
           name: { label: '标题', validation: { isRequired: true } },
           slug: { label: 'URL 路径（自动生成，可改）' },
         }),
-        date: fields.date({ label: '发布日期' }),
+        date: fields.date({ label: '发布日期', defaultValue: { kind: 'today' } }),
         content: fields.mdx({
           label: '正文',
           options: {
@@ -77,6 +79,8 @@ export default config({
     }),
     // ── 发表记录 ──────────────────────────────────────────────
     // 已发布的文章（data/blog/），即博客前台实际渲染的内容。
+    // 草稿通过 /api/publish 接口一键移入此集合（自动取正文第一行为标题、
+    // 自动生成日期），见 app/api/publish/route.ts。
     posts: collection({
       label: '发表记录',
       slugField: 'title',
@@ -95,7 +99,11 @@ export default config({
           name: { label: '标题', validation: { isRequired: true } },
           slug: { label: 'URL 路径（自动生成，可改）' },
         }),
-        date: fields.date({ label: '发布日期', validation: { isRequired: true } }),
+        date: fields.date({
+          label: '发布日期',
+          validation: { isRequired: true },
+          defaultValue: { kind: 'today' },
+        }),
         draft: fields.checkbox({ label: '草稿（勾选后前台不显示）', defaultValue: false }),
         // 正文图片统一存到 public/static/images（与博客其他图片一致）。
         // 注意：options.image 只管理"本地路径"图片；正文里若写 https:// 外链图片，

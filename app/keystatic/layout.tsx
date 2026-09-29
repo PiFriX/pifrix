@@ -643,6 +643,32 @@ const paragraphSizeScript = `(function () {
     if (menu && !menu.contains(e.target) && e.target.id !== 'ks-size-btn') closeMenu()
   })
   document.addEventListener('selectionchange', updateLabel)
+  // ── 回车换行继承字号（公众号式）──
+  // 在已设字号的段落里按回车：新段落继承该字号；后续段落序号整体 +1，
+  // 之前段落的字号保持不变。段落从中间拆开时同样适用（后半段继承）。
+  document.addEventListener('keydown', function (e) {
+    var ed = document.querySelector('[data-slate-editor="true"]')
+    if (!ed || !ed.contains(e.target)) return
+    if (e.key !== 'Enter' || e.shiftKey) return
+    var idx = curBlockIndex()
+    if (idx < 0) return
+    var size = map[idx] || null
+    setTimeout(function () {
+      // Slate 渲染出新段落后：idx 之后的所有段落序号顺移 +1，新段落继承字号
+      var keys = Object.keys(map)
+      for (var i = 0; i < keys.length; i++) {
+        var k = +keys[i]
+        if (k > idx) {
+          map[k + 1] = map[k]
+          delete map[k]
+        }
+      }
+      if (size != null) map[idx + 1] = size
+      applyCss()
+      saveMap()
+      updateLabel()
+    }, 120)
+  })
   // ── 轮询：应用已存字号 + 校验段落映射 ──
   setInterval(function () {
     var btn = document.getElementById('ks-size-btn')

@@ -95,11 +95,19 @@ export default function PostLayout({ content, authorDetails, next, prev, childre
             </dl>
             <div className="divide-y divide-gray-200 xl:col-span-3 xl:row-span-2 xl:pb-0 dark:divide-gray-700">
               <div
+                id="ks-prose-body"
                 className="prose dark:prose-invert max-w-none pt-10 pb-8"
-                style={content.fontSize ? { fontSize: `${content.fontSize}px` } : undefined}
+                style={{ fontSize: `${content.fontSize || 17}px` }}
+                data-para-sizes={content.paraSizes || ''}
               >
                 {children}
               </div>
+              <script
+                dangerouslySetInnerHTML={{
+                  __html:
+                    "(function(){var r=document.getElementById('ks-prose-body');if(!r)return;var d=r.getAttribute('data-para-sizes');if(!d)return;var m;try{m=JSON.parse(d)}catch(e){return};var k=r.children;for(var i in m){var el=k[+i];if(el)el.style.fontSize=m[i]+'px'}})()",
+                }}
+              />
               <div className="pt-6 pb-6 text-sm text-gray-700 dark:text-gray-300">
                 <Link href={discussUrl(path)} rel="nofollow">
                   Discuss on Twitter

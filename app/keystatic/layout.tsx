@@ -483,7 +483,7 @@ const fontSizeButtonScript = `(function () {
     }
     var input = findInput()
     var n = input ? parseInt(input.value, 10) : NaN
-    if (isNaN(n) || n < 1 || n > 20) n = 16
+    if (isNaN(n) || n < 1 || n > 20) n = 17
     var label = '字号：' + n
     if (!btn) {
       btn = document.createElement('button')
@@ -524,9 +524,185 @@ const fontSizeButtonScript = `(function () {
   function current() {
     var input = findInput()
     var n = input ? parseInt(input.value, 10) : NaN
-    if (isNaN(n) || n < 1 || n > 20) n = 16
+    if (isNaN(n) || n < 1 || n > 20) n = 17
     return n
   }
+})()`
+
+// 逐段字号（公众号式）：工具栏原「Paragraph」块类型下拉替换为「字号」下拉
+// （正文 + 1-20 号，号数即 px，与公众号一致）。光标所在段落选择字号后：
+//   1. 编辑区该段落立即应用字号（所见即所得）
+//   2. 写入隐藏的「段落字号」字段（JSON：{"段落序号":字号}），随 Save 保存
+// 博客前台由 layouts 里 data-para-sizes 脚本按同序号应用到正文段落；
+// 发布时 /api/publish 会把序号整体前移一位（正文第一行作标题被移除）。
+const paragraphSizeScript = `(function () {
+  var PREFIX = '段落字号'
+  var BASE = 17 // 公众号正文字号
+  function fieldInput() {
+    var labels = document.querySelectorAll('label')
+    for (var i = 0; i < labels.length; i++) {
+      if ((labels[i].textContent || '').trim().indexOf(PREFIX) === 0) {
+        var box = labels[i].closest('div')
+        while (box && !box.querySelector('input')) box = box.parentElement
+        return box ? box.querySelector('input') : null
+      }
+    }
+    return null
+  }
+  function onArticlePage() {
+    return /\\/collection\\/(drafts|posts)\\/(item\\/[^/]+|create)\\/?$/.test(location.pathname)
+  }
+  function blocks() {
+    var ed = document.querySelector('.mdxeditor [contenteditable="true"]')
+    if (!ed) return []
+    return Array.prototype.slice.call(ed.children).filter(function (el) {
+      return /^(P|H1|H2|H3|H4|H5|H6|UL|OL|BLOCKQUOTE|PRE|DIV)$/.test(el.tagName)
+    })
+  }
+  function setVal(input, value) {
+    var setter = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, 'value').set
+    setter.call(input, value)
+    input.dispatchEvent(new Event('input', { bubbles: true }))
+  }
+  var map = {}
+  var loaded = false
+  function loadMap() {
+    if (loaded) return
+    var input = fieldInput()
+    if (!input) return
+    try {
+      map = input.value ? JSON.parse(input.value) : {}
+    } catch (e) {
+      map = {}
+    }
+    loaded = true
+  }
+  function saveMap() {
+    var input = fieldInput()
+    var keys = Object.keys(map)
+    keys.sort(function (a, b) { return a - b })
+    var parts = []
+    for (var i = 0; i < keys.length; i++) parts.push('"' + keys[i] + '":' + map[keys[i]])
+    var s = '{' + parts.join(',') + '}'
+    if (input && input.value !== s) setVal(input, s)
+  }
+  // ── 菜单 ──
+  var menu = null
+  function closeMenu() {
+    if (menu) { menu.remove(); menu = null }
+  }
+  function buildMenu() {
+    closeMenu()
+    menu = document.createElement('div')
+    menu.id = 'ks-size-menu'
+    menu.style.cssText =
+      'position:fixed;z-index:10000;background:#fff;border:1px solid #e5e7eb;border-radius:10px;' +
+      'box-shadow:0 8px 24px rgba(0,0,0,.12);padding:6px 0;max-height:320px;overflow-y:auto;min-width:110px'
+    function item(label, px, isBase) {
+      var it = document.createElement('div')
+      it.textContent = label
+      it.style.cssText =
+        'padding:7px 18px;cursor:pointer;font-size:' + (isBase ? 14 : Math.max(11, Math.min(20, px))) + 'px;' +
+        'line-height:1.4;white-space:nowrap'
+      it.onmouseenter = function () { it.style.background = '#f3f4f6' }
+      it.onmouseleave = function () { it.style.background = '' }
+      it.onclick = function () { choose(isBase ? null : px) }
+      menu.appendChild(it)
+    }
+    item('正文', BASE, true)
+    for (var n = 1; n <= 20; n++) item(String(n), n, false)
+    document.body.appendChild(menu)
+    positionMenu()
+  }
+  function positionMenu() {
+    var btn = document.getElementById('ks-size-btn')
+    if (!btn || !menu) return
+    var r = btn.getBoundingClientRect()
+    menu.style.top = r.bottom + 6 + 'px'
+    menu.style.left = Math.max(8, r.left - 20) + 'px'
+  }
+  function curBlockIndex() {
+    var bs = blocks()
+    var sel = window.getSelection()
+    if (!sel || !sel.anchorNode) return -1
+    var node = sel.anchorNode
+    while (node && bs.indexOf(node) === -1) node = node.parentElement
+    return node ? bs.indexOf(node) : -1
+  }
+  function choose(px) {
+    var idx = curBlockIndex()
+    if (idx < 0) { alert('请先把光标放到要设置字号的段落里'); closeMenu(); return }
+    var el = blocks()[idx]
+    if (!el) { closeMenu(); return }
+    if (px === null) { delete map[idx]; el.style.fontSize = '' }
+    else { map[idx] = px; el.style.fontSize = px + 'px' }
+    saveMap()
+    closeMenu()
+  }
+  // ── 工具栏按钮 ──
+  function ensureButton() {
+    var ed = document.querySelector('.mdxeditor')
+    if (!ed) return
+    var btns = ed.querySelectorAll('button')
+    var target = null
+    for (var i = 0; i < btns.length; i++) {
+      var t = (btns[i].textContent || '').trim()
+      if (/^(Paragraph|Heading|Text)/.test(t)) { target = btns[i]; break }
+    }
+    if (!target) return
+    if (target.style.display !== 'none') target.style.display = 'none'
+    var mine = document.getElementById('ks-size-btn')
+    if (!mine) {
+      mine = document.createElement('button')
+      mine.id = 'ks-size-btn'
+      mine.type = 'button'
+      mine.textContent = '字号'
+      mine.style.cssText =
+        'border:none;background:transparent;cursor:pointer;color:#374151;font-size:14px;' +
+        'padding:4px 10px;border-radius:6px;display:inline-flex;align-items:center;gap:2px'
+      mine.onmouseenter = function () { mine.style.background = '#f3f4f6' }
+      mine.onmouseleave = function () { mine.style.background = 'transparent' }
+      mine.onclick = function (e) {
+        e.stopPropagation()
+        if (menu) closeMenu()
+        else buildMenu()
+      }
+      target.parentElement.insertBefore(mine, target)
+    }
+  }
+  document.addEventListener('click', function (e) {
+    if (menu && !menu.contains(e.target) && e.target.id !== 'ks-size-btn') closeMenu()
+  })
+  document.addEventListener('selectionchange', function () {
+    var btn = document.getElementById('ks-size-btn')
+    if (!btn) return
+    var idx = curBlockIndex()
+    if (idx >= 0 && map[idx]) btn.childNodes[0].nodeValue = '字号：' + map[idx]
+    else btn.childNodes[0].nodeValue = '字号'
+  })
+  // ── 轮询：应用已存字号 + 校验段落映射 ──
+  setInterval(function () {
+    var btn = document.getElementById('ks-size-btn')
+    if (!onArticlePage()) {
+      if (btn) btn.remove()
+      closeMenu()
+      loaded = false
+      map = {}
+      return
+    }
+    loadMap()
+    ensureButton()
+    var bs = blocks()
+    var changed = false
+    for (var k in map) {
+      if (+k >= bs.length) { delete map[k]; changed = true }
+    }
+    for (var k2 in map) {
+      var el = bs[+k2]
+      if (el && el.style.fontSize !== map[k2] + 'px') el.style.fontSize = map[k2] + 'px'
+    }
+    if (changed) saveMap()
+  }, 700)
 })()`
 
 // 素材库：「所在文件夹」字段自动回填。图片素材存 /static/images，视频等文件存
@@ -585,6 +761,7 @@ export default function KeystaticLayout() {
       <script dangerouslySetInnerHTML={{ __html: publishButtonScript }} />
       <script dangerouslySetInnerHTML={{ __html: draftToggleScript }} />
       <script dangerouslySetInnerHTML={{ __html: fontSizeButtonScript }} />
+      <script dangerouslySetInnerHTML={{ __html: paragraphSizeScript }} />
       <script dangerouslySetInnerHTML={{ __html: mediaFolderScript }} />
       <script dangerouslySetInnerHTML={{ __html: raiseOverlayScript }} />
       <KeystaticApp />

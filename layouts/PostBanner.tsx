@@ -40,11 +40,19 @@ export default function PostMinimal({ content, next, prev, children }: LayoutPro
             </div>
           </div>
           <div
+            id="ks-prose-body"
             className="prose dark:prose-invert max-w-none py-4"
-            style={content.fontSize ? { fontSize: `${content.fontSize}px` } : undefined}
+            style={{ fontSize: `${content.fontSize || 17}px` }}
+            data-para-sizes={content.paraSizes || ''}
           >
             {children}
           </div>
+          <script
+            dangerouslySetInnerHTML={{
+              __html:
+                "(function(){var r=document.getElementById('ks-prose-body');if(!r)return;var d=r.getAttribute('data-para-sizes');if(!d)return;var m;try{m=JSON.parse(d)}catch(e){return};var k=r.children;for(var i in m){var el=k[+i];if(el)el.style.fontSize=m[i]+'px'}})()",
+            }}
+          />
           {siteMetadata.comments && (
             <div className="pt-6 pb-6 text-center text-gray-700 dark:text-gray-300" id="comment">
               <Comments slug={slug} />

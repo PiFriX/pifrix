@@ -214,6 +214,24 @@ export async function POST(req: NextRequest) {
   // 草稿里设置的正文字号（1-20）随文章一起带入发表记录
   const fmSizeMatch = draftFm.match(/^\s*fontSize:\s*(\d+)\s*$/m)
   const fontSize = fmSizeMatch ? Math.min(20, Math.max(1, parseInt(fmSizeMatch[1], 10))) : null
+  // 逐段字号（公众号式）：{"草稿段落序号":字号}。草稿第 0 段是标题行（已被移除），
+  // 正文序号整体前移一位后写入发表记录
+  const fmParaMatch = draftFm.match(/^\s*paraSizes:\s*(["'])([^"'\n]*?)\1\s*$/m)
+  let paraSizes: string | null = null
+  if (fmParaMatch) {
+    try {
+      const raw = fmParaMatch[2].replace(/\\"/g, '"').replace(/\\\\/g, '\\').replace(/''/g, "'")
+      const obj: Record<string, number> = JSON.parse(raw)
+      const shifted: Record<string, number> = {}
+      for (const k of Object.keys(obj)) {
+        const n = parseInt(k, 10)
+        if (n >= 1 && obj[k] >= 1 && obj[k] <= 20) shifted[String(n - 1)] = obj[k]
+      }
+      if (Object.keys(shifted).length > 0) paraSizes = JSON.stringify(shifted)
+    } catch {
+      // 忽略解析失败，发布不带逐段字号
+    }
+  }
   const lines = body.split('\n')
   const titleIdx = lines.findIndex((l) => l.trim() !== '')
   let title = ''
@@ -230,6 +248,7 @@ export async function POST(req: NextRequest) {
   const newContent =
     `---\ntitle: ${yamlQuote(title)}\ndate: ${beijingToday()}` +
     (fontSize ? `\nfontSize: ${fontSize}` : '') +
+    (paraSizes ? `\nparaSizes: ${yamlQuote(paraSizes)}` : '') +
     `\n---\n\n${newBody}`
 
   // 3. 防覆盖检查

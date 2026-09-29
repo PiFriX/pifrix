@@ -40,7 +40,9 @@ export default config({
         }),
         date: fields.date({ label: '发布日期', defaultValue: { kind: 'today' } }),
         // 正文字号（1-20，博客前台真实生效）：面板隐藏后由右下角「字号」浮动按钮设置
-        fontSize: fields.integer({ label: '正文字号（1-20）', defaultValue: 16 }),
+        fontSize: fields.integer({ label: '正文字号（1-20）', defaultValue: 17 }),
+        // 逐段字号（公众号式）：工具栏「字号」下拉按段落设置，JSON {"段落序号":字号} 自动维护
+        paraSizes: fields.text({ label: '段落字号（自动）' }),
         content: fields.mdx({
           label: '正文',
           options: {
@@ -109,7 +111,9 @@ export default config({
           defaultValue: { kind: 'today' },
         }),
         // 正文字号（1-20，博客前台真实生效）：面板隐藏后由右下角「字号」浮动按钮设置
-        fontSize: fields.integer({ label: '正文字号（1-20）', defaultValue: 16 }),
+        fontSize: fields.integer({ label: '正文字号（1-20）', defaultValue: 17 }),
+        // 逐段字号（公众号式）：工具栏「字号」下拉按段落设置，JSON {"段落序号":字号} 自动维护
+        paraSizes: fields.text({ label: '段落字号（自动）' }),
         draft: fields.checkbox({ label: '草稿（勾选后前台不显示）', defaultValue: false }),
         // 正文图片统一存到 public/static/images（与博客其他图片一致）。
         // 注意：options.image 只管理"本地路径"图片；正文里若写 https:// 外链图片，

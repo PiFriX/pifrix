@@ -532,6 +532,8 @@ const paragraphSizeScript = `(function () {
         'line-height:1.4;white-space:nowrap'
       it.onmouseenter = function () { it.style.background = '#f3f4f6' }
       it.onmouseleave = function () { it.style.background = '' }
+      // mousedown 阻止默认行为，避免点击菜单时编辑器选区丢失
+      it.onmousedown = function (e) { e.preventDefault() }
       it.onclick = function () { choose(isBase ? null : px) }
       menu.appendChild(it)
     }
@@ -555,15 +557,30 @@ const paragraphSizeScript = `(function () {
     while (node && bs.indexOf(node) === -1) node = node.parentElement
     return node ? bs.indexOf(node) : -1
   }
+  // 光标最后所在的段落：点击字号菜单会让编辑器选区丢失，
+  // 记住最后位置，选择字号时回退使用
+  var lastIdx = -1
   function choose(px) {
     var idx = curBlockIndex()
-    if (idx < 0) { alert('请先把光标放到要设置字号的段落里'); closeMenu(); return }
+    if (idx < 0) idx = lastIdx
+    if (idx < 0) { closeMenu(); return }
     var el = blocks()[idx]
     if (!el) { closeMenu(); return }
     if (px === null) { delete map[idx]; el.style.fontSize = '' }
     else { map[idx] = px; el.style.fontSize = px + 'px' }
     saveMap()
+    updateLabel()
     closeMenu()
+  }
+  function updateLabel() {
+    var btn = document.getElementById('ks-size-btn')
+    if (!btn || !btn.childNodes.length) return
+    // 公众号式：按钮始终显示当前段落的实际字号（未设置时为正文默认 17px）
+    var idx = curBlockIndex()
+    if (idx >= 0) lastIdx = idx
+    else idx = lastIdx
+    var n = (idx >= 0 && map[idx]) ? map[idx] : BASE
+    btn.childNodes[0].nodeValue = n + 'px'
   }
   // ── 工具栏按钮 ──
   function ensureButton() {
@@ -579,7 +596,7 @@ const paragraphSizeScript = `(function () {
       mine = document.createElement('button')
       mine.id = 'ks-size-btn'
       mine.type = 'button'
-      mine.textContent = '字号'
+      mine.textContent = BASE + 'px'
       mine.style.cssText =
         'border:none;background:transparent;cursor:pointer;color:#374151;font-size:14px;' +
         'padding:4px 10px;border-radius:6px;display:inline-flex;align-items:center;gap:2px'
@@ -596,13 +613,7 @@ const paragraphSizeScript = `(function () {
   document.addEventListener('click', function (e) {
     if (menu && !menu.contains(e.target) && e.target.id !== 'ks-size-btn') closeMenu()
   })
-  document.addEventListener('selectionchange', function () {
-    var btn = document.getElementById('ks-size-btn')
-    if (!btn || !btn.childNodes.length) return
-    var idx = curBlockIndex()
-    if (idx >= 0 && map[idx]) btn.childNodes[0].nodeValue = map[idx] + 'px'
-    else btn.childNodes[0].nodeValue = '字号'
-  })
+  document.addEventListener('selectionchange', updateLabel)
   // ── 轮询：应用已存字号 + 校验段落映射 ──
   setInterval(function () {
     var btn = document.getElementById('ks-size-btn')

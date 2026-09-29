@@ -33,29 +33,38 @@ const hideSlugColumnScript = `(function () {
     if (!row) return
     var idx = Array.prototype.indexOf.call(row.children, head)
     if (idx < 0) return
-    // 定位整个表格/网格容器，按同一序号删除整列
+    // 定位整个表格/网格容器
     var grid = head.closest('table') || head.closest('[role="grid"]')
     if (!grid) return
-    // 列宽只收一次（run 会被 MutationObserver 反复触发）
-    if (!grid.__ksSlugFixed) {
-      grid.__ksSlugFixed = true
-      var cols = grid.querySelectorAll('colgroup col')
-      if (cols.length > idx) cols[idx].style.display = 'none'
-      var gt = grid.style ? grid.style.gridTemplateColumns : ''
-      if (gt) {
-        var parts = gt.split(' ')
-        if (parts.length > idx) {
-          parts.splice(idx, 1)
-          grid.style.gridTemplateColumns = parts.join(' ')
-        }
-      }
-    }
+    // 单元格宽度由虚拟定位器以内联 left/width 绝对定位（普通 flex 行兜底）。
+    // 只把 Slug 单元格 display:none 的话，右侧列仍停在原 left 坐标，
+    // Slug 位置会留一块空白；因此隐藏的同时把右侧单元格整体左移一个列宽。
+    var headLeft = parseFloat(head.style.left)
+    var headW = parseFloat(head.style.width)
+    if (isNaN(headW) || headW <= 0) headW = head.getBoundingClientRect().width
+    if (isNaN(headLeft)) headLeft = 0
     if (head.style.display !== 'none') head.style.display = 'none'
     var rows = grid.querySelectorAll('tr, [role="row"]')
     for (var r = 0; r < rows.length; r++) {
-      var cell = rows[r].children[idx]
-      if (cell && cell !== head && cell.style.display !== 'none') {
-        cell.style.display = 'none'
+      var rowEl = rows[r]
+      if (rowEl.__ksShifted) continue
+      rowEl.__ksShifted = true
+      var kids = rowEl.children
+      for (var c = 0; c < kids.length; c++) {
+        var k = kids[c]
+        if (k === head) continue
+        var l = parseFloat(k.style.left)
+        if (!isNaN(l)) {
+          // 绝对定位行：Slug 列本体隐藏，右侧列左移 headW
+          if (l >= headLeft - 1 && l <= headLeft + headW - 1) {
+            if (k.style.display !== 'none') k.style.display = 'none'
+          } else if (l > headLeft + headW - 1) {
+            k.style.left = l - headW + 'px'
+          }
+        } else if (c === idx && k.style.display !== 'none') {
+          // 普通文档流行（flex 布局）：直接隐藏本列单元格即可
+          k.style.display = 'none'
+        }
       }
     }
   }
@@ -130,13 +139,13 @@ const hideFieldsScript = `(function () {
     if (location.pathname.indexOf('/create') === -1) return
     var title = findField('标题')
     var slug = findField('URL 路径')
-    if (!title || !slug) return
-    var ti = title.querySelector('input')
-    var si = slug.querySelector('input')
-    if (!ti || !si || ti.value) return
     var stamp = timestamp()
-    setVal(ti, stamp)
-    setVal(si, stamp)
+    // 标题和 slug 各自独立补缺：标题可能已被 syncTitleScript 填成正文第一行，
+    // 不能因此跳过 slug（否则 Create 时 slug 必填校验失败且报错被面板挡住，看似没反应）
+    var ti = title && title.querySelector('input')
+    if (ti && !ti.value) setVal(ti, stamp)
+    var si = slug && slug.querySelector('input')
+    if (si && !si.value) setVal(si, stamp)
   }
   // 多个字段容器的最近公共祖先 = 侧栏面板
   function commonAncestor(els) {

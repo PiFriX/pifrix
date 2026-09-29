@@ -279,7 +279,7 @@ const syncTitleScript = `(function () {
   }
   function firstLine() {
     var ed =
-      document.querySelector('.mdxeditor [contenteditable="true"]') ||
+      document.querySelector('.ProseMirror[contenteditable="true"]') ||
       document.querySelector('[contenteditable="true"]')
     if (!ed) return ''
     var blocks = ed.querySelectorAll('p, h1, h2, h3, h4, h5, h6')
@@ -475,11 +475,14 @@ const paragraphSizeScript = `(function () {
     return /\\/collection\\/(drafts|posts)\\/(item\\/[^/]+|create)\\/?$/.test(location.pathname)
   }
   function editorEl() {
-    // Keystatic 0.6.9 编辑器是 Slate 内核：可编辑根节点带 data-slate-editor="true"
+    // Keystatic 0.6.9 的文档编辑器是 ProseMirror：根节点 class="ProseMirror"。
+    // 注意不是 Slate——页面上不存在 data-slate-editor 属性（此前 CSS 规则
+    // 按该属性写导致全部落空，字号永远不生效）
     var ed =
+      document.querySelector('.ProseMirror[contenteditable="true"]') ||
       document.querySelector('[data-slate-editor="true"]') ||
       document.querySelector('[contenteditable="true"]')
-    // 打标记 id 供 CSS 规则定位（Slate 重渲染会重建 DOM，id 丢失时由轮询补回）
+    // 打标记 id 供 CSS 规则定位（编辑器重建 DOM 后 id 丢失时由轮询补回）
     if (ed && ed.id !== 'ks-slate-editor') ed.id = 'ks-slate-editor'
     return ed
   }
@@ -503,8 +506,10 @@ const paragraphSizeScript = `(function () {
     var keys = Object.keys(map)
     for (var i = 0; i < keys.length; i++) {
       var k = keys[i]
-      var sel = '[data-slate-editor="true"] > :nth-child(' + (+k + 1) + ')'
-      rules.push(sel + '{font-size:' + map[k] + 'px !important}')
+      var sel = '.ProseMirror > :nth-child(' + (+k + 1) + ')'
+      // 同时覆盖段落内部所有子元素：若内层元素自带 font-size 声明，
+      // 仅设父级会因「自身声明优先于继承」被无视
+      rules.push(sel + ', ' + sel + ' *' + '{font-size:' + map[k] + 'px !important}')
     }
     style.textContent = rules.join('\\n')
   }
@@ -647,7 +652,7 @@ const paragraphSizeScript = `(function () {
   // 在已设字号的段落里按回车：新段落继承该字号；后续段落序号整体 +1，
   // 之前段落的字号保持不变。段落从中间拆开时同样适用（后半段继承）。
   document.addEventListener('keydown', function (e) {
-    var ed = document.querySelector('[data-slate-editor="true"]')
+    var ed = editorEl()
     if (!ed || !ed.contains(e.target)) return
     if (e.key !== 'Enter' || e.shiftKey) return
     var idx = curBlockIndex()
@@ -711,7 +716,7 @@ const paragraphSizeScript = `(function () {
   // 文档级监听不受影响：只在用户交互后才改 DOM，交互必然晚于水合。
   if (document.readyState === 'complete') setTimeout(boot, 800)
   else window.addEventListener('load', function () { setTimeout(boot, 800) })
-  console.log('[ks-size] v6 active (boot deferred until after hydration)')
+  console.log('[ks-size] v7 active (ProseMirror selector)')
 })()`
 
 // 素材库：「所在文件夹」字段自动回填。图片素材存 /static/images，视频等文件存

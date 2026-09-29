@@ -475,7 +475,10 @@ const paragraphSizeScript = `(function () {
     return /\\/collection\\/(drafts|posts)\\/(item\\/[^/]+|create)\\/?$/.test(location.pathname)
   }
   function blocks() {
-    var ed = document.querySelector('.mdxeditor [contenteditable="true"]')
+    // Keystatic 0.6.9 编辑器是 Slate 内核：可编辑根节点带 data-slate-editor="true"
+    var ed =
+      document.querySelector('[data-slate-editor="true"]') ||
+      document.querySelector('[contenteditable="true"]')
     if (!ed) return []
     return Array.prototype.slice.call(ed.children).filter(function (el) {
       return /^(P|H1|H2|H3|H4|H5|H6|UL|OL|BLOCKQUOTE|PRE|DIV)$/.test(el.tagName)
@@ -564,19 +567,11 @@ const paragraphSizeScript = `(function () {
   }
   // ── 工具栏按钮 ──
   function ensureButton() {
-    // 编辑器工具栏容器：mdxeditor 根节点（兜底 role=toolbar 区域）
-    var containers = document.querySelectorAll('.mdxeditor, [role="toolbar"]')
-    if (!containers.length) return
-    var target = null
-    for (var c = 0; c < containers.length && !target; c++) {
-      var btns = containers[c].querySelectorAll('button')
-      for (var i = 0; i < btns.length; i++) {
-        var b = btns[i]
-        var t = (b.textContent || '').trim()
-        var a = b.getAttribute('aria-label') || ''
-        if (/^(Paragraph|Heading|Text)/.test(t) || /Paragraph/i.test(a)) { target = b; break }
-      }
-    }
+    // Keystatic 的块类型下拉是 @keystar/ui Picker：触发按钮 aria-label="Text block"
+    // （显示当前值 Paragraph / Heading 1-6），直接按该特征定位并替换
+    var target =
+      document.querySelector('button[aria-label="Text block"]') ||
+      document.querySelector('button[aria-label*="block" i]')
     if (!target) return
     if (target.style.display !== 'none') target.style.display = 'none'
     var mine = document.getElementById('ks-size-btn')

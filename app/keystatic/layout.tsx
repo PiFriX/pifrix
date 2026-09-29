@@ -506,7 +506,7 @@ const paragraphSizeScript = `(function () {
       var sel = '[data-slate-editor="true"] > :nth-child(' + (+k + 1) + ')'
       rules.push(sel + '{font-size:' + map[k] + 'px !important}')
     }
-    style.textContent = rules.join('\n')
+    style.textContent = rules.join('\\n')
   }
   function setVal(input, value) {
     var setter = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, 'value').set

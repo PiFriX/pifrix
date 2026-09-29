@@ -474,15 +474,39 @@ const paragraphSizeScript = `(function () {
   function onArticlePage() {
     return /\\/collection\\/(drafts|posts)\\/(item\\/[^/]+|create)\\/?$/.test(location.pathname)
   }
-  function blocks() {
+  function editorEl() {
     // Keystatic 0.6.9 编辑器是 Slate 内核：可编辑根节点带 data-slate-editor="true"
     var ed =
       document.querySelector('[data-slate-editor="true"]') ||
       document.querySelector('[contenteditable="true"]')
+    // 打标记 id 供 CSS 规则定位（Slate 重渲染会重建 DOM，id 丢失时由轮询补回）
+    if (ed && ed.id !== 'ks-slate-editor') ed.id = 'ks-slate-editor'
+    return ed
+  }
+  function blocks() {
+    var ed = editorEl()
     if (!ed) return []
-    return Array.prototype.slice.call(ed.children).filter(function (el) {
-      return /^(P|H1|H2|H3|H4|H5|H6|UL|OL|BLOCKQUOTE|PRE|DIV)$/.test(el.tagName)
-    })
+    // 取全部元素子节点，保证序号与 CSS nth-child 一一对应
+    return Array.prototype.slice.call(ed.children)
+  }
+  // 字号用 CSS 规则应用而非内联样式：Slate/React 重渲染会抹掉内联样式，
+  // CSS 规则在浏览器层面持续生效，不受重渲染影响
+  function applyCss() {
+    var style = document.getElementById('ks-size-style')
+    if (!style) {
+      style = document.createElement('style')
+      style.id = 'ks-size-style'
+      document.head.appendChild(style)
+    }
+    var rules = []
+    var keys = Object.keys(map)
+    for (var i = 0; i < keys.length; i++) {
+      var k = keys[i]
+      rules.push(
+        '#ks-slate-editor > :nth-child(' + (+k + 1) + '){font-size:' + map[k] + 'px !important}'
+      )
+    }
+    style.textContent = rules.join('\n')
   }
   function setVal(input, value) {
     var setter = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, 'value').set
@@ -501,6 +525,7 @@ const paragraphSizeScript = `(function () {
       map = {}
     }
     loaded = true
+    applyCss() // 进入页面时应用已保存的段落字号
   }
   function saveMap() {
     var input = fieldInput()
@@ -566,8 +591,9 @@ const paragraphSizeScript = `(function () {
     if (idx < 0) { closeMenu(); return }
     var el = blocks()[idx]
     if (!el) { closeMenu(); return }
-    if (px === null) { delete map[idx]; el.style.fontSize = '' }
-    else { map[idx] = px; el.style.fontSize = px + 'px' }
+    if (px === null) delete map[idx]
+    else map[idx] = px
+    applyCss()
     saveMap()
     updateLabel()
     closeMenu()
@@ -626,16 +652,13 @@ const paragraphSizeScript = `(function () {
     }
     loadMap()
     ensureButton()
+    editorEl() // Slate 重渲染重建 DOM 后补回 id，CSS 规则持续有效
     var bs = blocks()
     var changed = false
     for (var k in map) {
       if (+k >= bs.length) { delete map[k]; changed = true }
     }
-    for (var k2 in map) {
-      var el = bs[+k2]
-      if (el && el.style.fontSize !== map[k2] + 'px') el.style.fontSize = map[k2] + 'px'
-    }
-    if (changed) saveMap()
+    if (changed) { saveMap(); applyCss() }
   }, 700)
 })()`
 

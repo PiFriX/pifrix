@@ -489,8 +489,9 @@ const paragraphSizeScript = `(function () {
     // 取全部元素子节点，保证序号与 CSS nth-child 一一对应
     return Array.prototype.slice.call(ed.children)
   }
-  // 字号用 CSS 规则应用而非内联样式：Slate/React 重渲染会抹掉内联样式，
-  // CSS 规则在浏览器层面持续生效，不受重渲染影响
+  // 字号用 CSS 规则应用而非仅内联样式：Slate/React 重渲染会抹掉内联样式，
+  // CSS 规则在浏览器层面持续生效，不受重渲染影响。规则直接按 Slate 编辑器
+  // 属性定位，不依赖任何 id 标记；选择时同时写内联样式保证即时反馈。
   function applyCss() {
     var style = document.getElementById('ks-size-style')
     if (!style) {
@@ -502,9 +503,8 @@ const paragraphSizeScript = `(function () {
     var keys = Object.keys(map)
     for (var i = 0; i < keys.length; i++) {
       var k = keys[i]
-      rules.push(
-        '#ks-slate-editor > :nth-child(' + (+k + 1) + '){font-size:' + map[k] + 'px !important}'
-      )
+      var sel = '[data-slate-editor="true"] > :nth-child(' + (+k + 1) + ')'
+      rules.push(sel + '{font-size:' + map[k] + 'px !important}')
     }
     style.textContent = rules.join('\n')
   }
@@ -591,8 +591,11 @@ const paragraphSizeScript = `(function () {
     if (idx < 0) { closeMenu(); return }
     var el = blocks()[idx]
     if (!el) { closeMenu(); return }
-    if (px === null) delete map[idx]
-    else map[idx] = px
+    if (px === null) { delete map[idx]; el.style.fontSize = '' }
+    else {
+      map[idx] = px
+      el.style.fontSize = px + 'px' // 即时反馈；持久性由 CSS 规则保证
+    }
     applyCss()
     saveMap()
     updateLabel()
@@ -652,14 +655,20 @@ const paragraphSizeScript = `(function () {
     }
     loadMap()
     ensureButton()
-    editorEl() // Slate 重渲染重建 DOM 后补回 id，CSS 规则持续有效
+    editorEl() // Slate 重渲染重建 DOM 后补回 id
     var bs = blocks()
     var changed = false
     for (var k in map) {
       if (+k >= bs.length) { delete map[k]; changed = true }
     }
     if (changed) { saveMap(); applyCss() }
+    // 兜底：CSS 之外同步内联样式（被 Slate 抹掉就重放，CSS 规则始终在）
+    for (var k2 in map) {
+      var el = bs[+k2]
+      if (el && el.style.fontSize !== map[k2] + 'px') el.style.fontSize = map[k2] + 'px'
+    }
   }, 700)
+  console.log('[ks-size] v4 active')
 })()`
 
 // 素材库：「所在文件夹」字段自动回填。图片素材存 /static/images，视频等文件存

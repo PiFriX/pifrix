@@ -63,9 +63,11 @@ const popupLayerStyle = `
   .mdxeditor [data-radix-popper-content-wrapper] { z-index: 999 !important; }
 `
 
-// 编辑条目页（URL 含 /item/）隐藏侧栏表单字段：标题 / URL 路径 / 发布日期。
+// 草稿箱/发表记录的新建页与编辑页，隐藏侧栏表单字段：标题 / URL 路径 / 发布日期。
 // 用户要求公众号式写作：正文第一行即标题，URL 和日期发布时自动生成。
-// 创建页（/create）不隐藏——首次仍需填一次标题作为文件名。
+// 新建页（/create）字段隐藏的同时由脚本自动填入时间戳（draft-20260929-171718）
+// 作为文件名——Keystatic 创建条目必须有一个 slug，绕不开；真正的标题以发布时
+// 正文第一行为准（见 app/api/publish/route.ts）。
 // 隐藏不等于清空：字段值仍在，保存不受影响。
 const hideFieldsScript = `(function () {
   var PREFIXES = ['标题', 'URL 路径', '发布日期']
@@ -77,23 +79,58 @@ const hideFieldsScript = `(function () {
       run()
     })
   }
-  function run() {
-    if (location.pathname.indexOf('/item/') === -1) return
+  function isEntryPage() {
+    return /\\/collection\\/(drafts|posts)\\/(item\\/[^/]+|create)\\/?$/.test(location.pathname)
+  }
+  // React 受控输入必须用原生 setter + input 事件才能正确赋值
+  function setVal(input, value) {
+    var setter = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, 'value').set
+    setter.call(input, value)
+    input.dispatchEvent(new Event('input', { bubbles: true }))
+  }
+  function findField(prefix) {
     var labels = document.querySelectorAll('label')
     for (var i = 0; i < labels.length; i++) {
-      var text = (labels[i].textContent || '').trim()
-      for (var j = 0; j < PREFIXES.length; j++) {
-        if (text.indexOf(PREFIXES[j]) === 0) {
-          // 向上找"只包含这一个字段"的最外层容器并隐藏
-          var el = labels[i]
-          while (el.parentElement && el.parentElement.querySelectorAll('label').length === 1) {
-            el = el.parentElement
-          }
-          if (el.style.display !== 'none') el.style.display = 'none'
-          break
+      if ((labels[i].textContent || '').trim().indexOf(prefix) === 0) {
+        // 向上找"只包含这一个字段"的最外层容器
+        var el = labels[i]
+        while (el.parentElement && el.parentElement.querySelectorAll('label').length === 1) {
+          el = el.parentElement
         }
+        return el
       }
     }
+    return null
+  }
+  function timestamp() {
+    var d = new Date()
+    function p(n) {
+      return (n < 10 ? '0' : '') + n
+    }
+    return (
+      '' + d.getFullYear() + p(d.getMonth() + 1) + p(d.getDate()) +
+      '-' + p(d.getHours()) + p(d.getMinutes()) + p(d.getSeconds())
+    )
+  }
+  function autofillCreate() {
+    if (location.pathname.indexOf('/create') === -1) return
+    var title = findField('标题')
+    var slug = findField('URL 路径')
+    if (!title || !slug) return
+    var ti = title.querySelector('input')
+    var si = slug.querySelector('input')
+    if (!ti || !si || ti.value) return
+    var stamp = timestamp()
+    setVal(ti, stamp)
+    setVal(si, stamp)
+  }
+  function run() {
+    if (!isEntryPage()) return
+    for (var j = 0; j < PREFIXES.length; j++) {
+      var el = findField(PREFIXES[j])
+      if (el && el.style.display !== 'none') el.style.display = 'none'
+    }
+    autofillCreate()
   }
   if (window.__ksHideFieldsObserver) return
   window.__ksHideFieldsObserver = new MutationObserver(schedule)

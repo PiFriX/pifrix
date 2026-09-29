@@ -663,38 +663,55 @@ const paragraphSizeScript = `(function () {
           delete map[k]
         }
       }
-      if (size != null) map[idx + 1] = size
+      if (size != null) {
+        map[idx + 1] = size
+        var nel = blocks()[idx + 1]
+        if (nel) nel.style.fontSize = size + 'px' // 即时反馈；持久性由 CSS 规则保证
+      }
       applyCss()
       saveMap()
       updateLabel()
     }, 120)
   })
   // ── 轮询：应用已存字号 + 校验段落映射 ──
-  setInterval(function () {
-    var btn = document.getElementById('ks-size-btn')
-    if (!onArticlePage()) {
-      if (btn) btn.remove()
-      closeMenu()
-      loaded = false
-      map = {}
-      return
-    }
-    loadMap()
-    ensureButton()
-    editorEl() // Slate 重渲染重建 DOM 后补回 id
-    var bs = blocks()
-    var changed = false
-    for (var k in map) {
-      if (+k >= bs.length) { delete map[k]; changed = true }
-    }
-    if (changed) { saveMap(); applyCss() }
-    // 兜底：CSS 之外同步内联样式（被 Slate 抹掉就重放，CSS 规则始终在）
-    for (var k2 in map) {
-      var el = bs[+k2]
-      if (el && el.style.fontSize !== map[k2] + 'px') el.style.fontSize = map[k2] + 'px'
-    }
-  }, 700)
-  console.log('[ks-size] v4 active')
+  function boot() {
+    setInterval(function () {
+      var btn = document.getElementById('ks-size-btn')
+      if (!onArticlePage()) {
+        if (btn) btn.remove()
+        closeMenu()
+        loaded = false
+        map = {}
+        return
+      }
+      loadMap()
+      ensureButton()
+      editorEl() // Slate 重渲染重建 DOM 后补回 id
+      var bs = blocks()
+      var changed = false
+      // 只在编辑器实际渲染且有段落时才清理失效序号——React 水合失败恢复
+      // （error #41 → 整树客户端重渲染）时编辑器会短暂卸载/为空，
+      // 此时清理会把全部字号误删，表现为「设置的字号弹回默认」
+      if (bs.length > 0) {
+        for (var k in map) {
+          if (+k >= bs.length) { delete map[k]; changed = true }
+        }
+      }
+      if (changed) { saveMap(); applyCss() }
+      // 兜底：CSS 之外同步内联样式（被 Slate 抹掉就重放，CSS 规则始终在）
+      for (var k2 in map) {
+        var el = bs[+k2]
+        if (el && el.style.fontSize !== map[k2] + 'px') el.style.fontSize = map[k2] + 'px'
+      }
+    }, 700)
+  }
+  // 等页面 load 后再启动：注入脚本是内联执行，早于 React 水合；
+  // 在水合完成前隐藏原生下拉/插入按钮等 DOM 改动会触发水合校验失败
+  //（error #41，整树客户端重渲染 → 编辑器短暂卸载 → 连锁问题）。
+  // 文档级监听不受影响：只在用户交互后才改 DOM，交互必然晚于水合。
+  if (document.readyState === 'complete') setTimeout(boot, 800)
+  else window.addEventListener('load', function () { setTimeout(boot, 800) })
+  console.log('[ks-size] v6 active (boot deferred until after hydration)')
 })()`
 
 // 素材库：「所在文件夹」字段自动回填。图片素材存 /static/images，视频等文件存

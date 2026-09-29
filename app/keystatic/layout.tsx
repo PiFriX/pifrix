@@ -730,6 +730,25 @@ export default function KeystaticLayout() {
       <script dangerouslySetInnerHTML={{ __html: mediaFolderScript }} />
       <script dangerouslySetInnerHTML={{ __html: raiseOverlayScript }} />
       <KeystaticApp />
+      {/* 版本徽标：服务端渲染、不依赖脚本，用于确认浏览器拿到的是哪一版页面 */}
+      <div
+        id="ks-version-badge"
+        style={{
+          position: 'fixed',
+          left: 6,
+          bottom: 6,
+          zIndex: 10001,
+          fontSize: 11,
+          lineHeight: 1,
+          color: '#9ca3af',
+          background: 'rgba(255,255,255,.8)',
+          padding: '3px 6px',
+          borderRadius: 6,
+          pointerEvents: 'none',
+        }}
+      >
+        后台 v4
+      </div>
     </div>
   )
 }

@@ -100,6 +100,8 @@ export const Blog = defineDocumentType(() => ({
   fields: {
     title: { type: 'string', required: true },
     date: { type: 'date', required: true },
+    // 正文字号（1-20，px），Keystatic 后台的「字号」浮动按钮设置；缺省用默认字号
+    fontSize: { type: 'number' },
     tags: { type: 'list', of: { type: 'string' }, default: [] },
     lastmod: { type: 'date' },
     draft: { type: 'boolean' },

@@ -39,6 +39,8 @@ export default config({
           slug: { label: 'URL 路径（自动生成，可改）' },
         }),
         date: fields.date({ label: '发布日期', defaultValue: { kind: 'today' } }),
+        // 正文字号（1-20，博客前台真实生效）：面板隐藏后由右下角「字号」浮动按钮设置
+        fontSize: fields.integer({ label: '正文字号（1-20）', defaultValue: 16 }),
         content: fields.mdx({
           label: '正文',
           options: {
@@ -51,26 +53,28 @@ export default config({
       },
     }),
     // ── 素材库 ────────────────────────────────────────────────
-    // 每个条目 = 一份素材：图片存 public/static/images，视频等文件存
-    // public/static/media。点进条目可预览图片、查看/下载视频文件；
-    // 正文里引用时用编辑器图片按钮或粘贴对应 /static/... 路径。
+    // 每个条目 = 一个素材文件夹：图片存 public/static/images，视频等文件存
+    // public/static/media。「所在文件夹」字段由注入脚本根据已上传的素材自动回填，
+    // 列表里直接展示每个素材的图片/视频所在路径；点进条目可预览图片、查看/下载视频。
     media: collection({
       label: '素材库',
       slugField: 'name',
       path: 'data/media/*',
       format: { data: 'yaml' },
+      columns: ['name', 'folder'],
       schema: {
         name: fields.slug({
           name: { label: '素材名称', validation: { isRequired: true } },
-          slug: { label: '文件标识（自动生成，可改）' },
+          slug: { label: '文件夹（自动生成，可改）' },
         }),
+        folder: fields.text({ label: '所在文件夹（自动）' }),
         image: fields.image({
-          label: '图片素材',
+          label: '图片素材（保存在 /static/images 文件夹）',
           directory: 'public/static/images',
           publicPath: '/static/images',
         }),
         video: fields.file({
-          label: '视频/文件素材',
+          label: '视频/文件素材（保存在 /static/media 文件夹）',
           directory: 'public/static/media',
           publicPath: '/static/media',
         }),
@@ -104,6 +108,8 @@ export default config({
           validation: { isRequired: true },
           defaultValue: { kind: 'today' },
         }),
+        // 正文字号（1-20，博客前台真实生效）：面板隐藏后由右下角「字号」浮动按钮设置
+        fontSize: fields.integer({ label: '正文字号（1-20）', defaultValue: 16 }),
         draft: fields.checkbox({ label: '草稿（勾选后前台不显示）', defaultValue: false }),
         // 正文图片统一存到 public/static/images（与博客其他图片一致）。
         // 注意：options.image 只管理"本地路径"图片；正文里若写 https:// 外链图片，

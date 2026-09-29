@@ -451,6 +451,126 @@ const draftToggleScript = `(function () {
   schedule()
 })()`
 
+// 正文字号（1-20）：右侧面板隐藏后，用右下角「字号」浮动按钮代替面板里的
+// 「正文字号（1-20）」字段。选择后写入隐藏字段（点 Save 保存 / 随 🚀 发布一起生效），
+// 并实时应用到编辑区做所见即所得预览。博客前台由 contentlayer fontSize 字段渲染。
+const fontSizeButtonScript = `(function () {
+  var PREFIX = '正文字号'
+  function findInput() {
+    var labels = document.querySelectorAll('label')
+    for (var i = 0; i < labels.length; i++) {
+      if ((labels[i].textContent || '').trim().indexOf(PREFIX) === 0) {
+        var box = labels[i].closest('div')
+        while (box && !box.querySelector('input')) box = box.parentElement
+        return box ? box.querySelector('input') : null
+      }
+    }
+    return null
+  }
+  function onArticlePage() {
+    return /\\/collection\\/(drafts|posts)\\/(item\\/[^/]+|create)\\/?$/.test(location.pathname)
+  }
+  function applyPreview(n) {
+    var ed = document.querySelector('.mdxeditor [contenteditable="true"]')
+    if (ed && ed.style.fontSize !== n + 'px') ed.style.fontSize = n + 'px'
+  }
+  var lastShown = ''
+  setInterval(function () {
+    var btn = document.getElementById('ks-fontsize-btn')
+    if (!onArticlePage()) {
+      if (btn) btn.remove()
+      return
+    }
+    var input = findInput()
+    var n = input ? parseInt(input.value, 10) : NaN
+    if (isNaN(n) || n < 1 || n > 20) n = 16
+    var label = '字号：' + n
+    if (!btn) {
+      btn = document.createElement('button')
+      btn.id = 'ks-fontsize-btn'
+      btn.type = 'button'
+      btn.style.cssText =
+        'position:fixed;right:28px;bottom:28px;z-index:9999;padding:8px 18px;' +
+        'border-radius:999px;border:1px solid #d1d5db;background:#fff;color:#374151;' +
+        'font-size:13px;cursor:pointer'
+      btn.onclick = function () {
+        var input = findInput()
+        var v = prompt('正文字号（1-20，默认 16）：', String(current()))
+        if (v === null) return
+        var num = parseInt(v, 10)
+        if (isNaN(num) || num < 1 || num > 20) {
+          alert('请输入 1-20 之间的整数')
+          return
+        }
+        if (input) {
+          var setter = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, 'value').set
+          setter.call(input, String(num))
+          input.dispatchEvent(new Event('input', { bubbles: true }))
+        }
+        applyPreview(num)
+        alert('正文字号已设为 ' + num + '，记得点 Save 保存（或用 🚀 发布）')
+      }
+      document.body.appendChild(btn)
+    }
+    // 🚀 发布按钮也在右下角时，字号按钮上移避开
+    var pub = document.getElementById('ks-publish-btn')
+    btn.style.bottom = pub ? '88px' : '28px'
+    if (btn.textContent !== label) btn.textContent = label
+    if (lastShown !== String(n)) {
+      lastShown = String(n)
+      applyPreview(n)
+    }
+  }, 600)
+  function current() {
+    var input = findInput()
+    var n = input ? parseInt(input.value, 10) : NaN
+    if (isNaN(n) || n < 1 || n > 20) n = 16
+    return n
+  }
+})()`
+
+// 素材库：「所在文件夹」字段自动回填。图片素材存 /static/images，视频等文件存
+// /static/media——根据哪个字段有值自动写入，素材库列表的「所在文件夹」列
+// 直接展示每个素材的文件所在路径。
+const mediaFolderScript = `(function () {
+  var MAPS = [
+    ['图片素材', '/static/images'],
+    ['视频/文件素材', '/static/media'],
+  ]
+  function fieldInput(prefix) {
+    var labels = document.querySelectorAll('label')
+    for (var i = 0; i < labels.length; i++) {
+      if ((labels[i].textContent || '').trim().indexOf(prefix) === 0) {
+        var el = labels[i]
+        while (el.parentElement && el.parentElement.querySelectorAll('label').length === 1) {
+          el = el.parentElement
+        }
+        return el.querySelector('input')
+      }
+    }
+    return null
+  }
+  function onMediaPage() {
+    return /\\/collection\\/media\\/(item\\/[^/]+|create)\\/?$/.test(location.pathname)
+  }
+  setInterval(function () {
+    if (!onMediaPage()) return
+    var folder = fieldInput('所在文件夹')
+    if (!folder) return
+    var parts = []
+    for (var i = 0; i < MAPS.length; i++) {
+      var inp = fieldInput(MAPS[i][0])
+      if (inp && inp.value) parts.push(MAPS[i][1])
+    }
+    var val = parts.join(' + ')
+    if (val && folder.value !== val) {
+      var setter = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, 'value').set
+      setter.call(folder, val)
+      folder.dispatchEvent(new Event('input', { bubbles: true }))
+    }
+  }, 800)
+})()`
+
 // Keystatic 后台布局：全屏容器盖住博客的页头页脚，后台独立呈现
 export default function KeystaticLayout() {
   return (
@@ -464,6 +584,8 @@ export default function KeystaticLayout() {
       <script dangerouslySetInnerHTML={{ __html: syncTitleScript }} />
       <script dangerouslySetInnerHTML={{ __html: publishButtonScript }} />
       <script dangerouslySetInnerHTML={{ __html: draftToggleScript }} />
+      <script dangerouslySetInnerHTML={{ __html: fontSizeButtonScript }} />
+      <script dangerouslySetInnerHTML={{ __html: mediaFolderScript }} />
       <script dangerouslySetInnerHTML={{ __html: raiseOverlayScript }} />
       <KeystaticApp />
     </div>

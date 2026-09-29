@@ -203,10 +203,17 @@ export async function POST(req: NextRequest) {
 
   // 2. 分离 frontmatter 与正文，取第一行作标题
   let body = raw
+  let draftFm = ''
   if (raw.startsWith('---')) {
     const end = raw.indexOf('\n---', 3)
-    if (end !== -1) body = raw.slice(end + 4).replace(/^\s*\n/, '')
+    if (end !== -1) {
+      draftFm = raw.slice(4, end)
+      body = raw.slice(end + 4).replace(/^\s*\n/, '')
+    }
   }
+  // 草稿里设置的正文字号（1-20）随文章一起带入发表记录
+  const fmSizeMatch = draftFm.match(/^\s*fontSize:\s*(\d+)\s*$/m)
+  const fontSize = fmSizeMatch ? Math.min(20, Math.max(1, parseInt(fmSizeMatch[1], 10))) : null
   const lines = body.split('\n')
   const titleIdx = lines.findIndex((l) => l.trim() !== '')
   let title = ''
@@ -220,7 +227,10 @@ export async function POST(req: NextRequest) {
       .join('\n')
       .replace(/^\s*\n/, '')
       .trimEnd() + '\n'
-  const newContent = `---\ntitle: ${yamlQuote(title)}\ndate: ${beijingToday()}\n---\n\n${newBody}`
+  const newContent =
+    `---\ntitle: ${yamlQuote(title)}\ndate: ${beijingToday()}` +
+    (fontSize ? `\nfontSize: ${fontSize}` : '') +
+    `\n---\n\n${newBody}`
 
   // 3. 防覆盖检查
   const existRes = await gh(blogPath, {}, token)

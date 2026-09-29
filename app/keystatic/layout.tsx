@@ -713,7 +713,11 @@ const mediaFolderScript = `(function () {
   }, 800)
 })()`
 
-// Keystatic 后台布局：全屏容器盖住博客的页头页脚，后台独立呈现
+// Keystatic 后台布局：全屏容器盖住博客的页头页脚，后台独立呈现。
+// force-dynamic：每次请求都返回最新页面，禁止任何静态/CDN/浏览器缓存，
+// 避免改版后浏览器还打开旧页面。
+export const dynamic = 'force-dynamic'
+
 export default function KeystaticLayout() {
   return (
     <div
@@ -747,7 +751,7 @@ export default function KeystaticLayout() {
           pointerEvents: 'none',
         }}
       >
-        后台 v4
+        后台 v5
       </div>
     </div>
   )

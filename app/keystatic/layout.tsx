@@ -451,86 +451,8 @@ const draftToggleScript = `(function () {
   schedule()
 })()`
 
-// 正文字号（1-20）：右侧面板隐藏后，用右下角「字号」浮动按钮代替面板里的
-// 「正文字号（1-20）」字段。选择后写入隐藏字段（点 Save 保存 / 随 🚀 发布一起生效），
-// 并实时应用到编辑区做所见即所得预览。博客前台由 contentlayer fontSize 字段渲染。
-const fontSizeButtonScript = `(function () {
-  var PREFIX = '正文字号'
-  function findInput() {
-    var labels = document.querySelectorAll('label')
-    for (var i = 0; i < labels.length; i++) {
-      if ((labels[i].textContent || '').trim().indexOf(PREFIX) === 0) {
-        var box = labels[i].closest('div')
-        while (box && !box.querySelector('input')) box = box.parentElement
-        return box ? box.querySelector('input') : null
-      }
-    }
-    return null
-  }
-  function onArticlePage() {
-    return /\\/collection\\/(drafts|posts)\\/(item\\/[^/]+|create)\\/?$/.test(location.pathname)
-  }
-  function applyPreview(n) {
-    var ed = document.querySelector('.mdxeditor [contenteditable="true"]')
-    if (ed && ed.style.fontSize !== n + 'px') ed.style.fontSize = n + 'px'
-  }
-  var lastShown = ''
-  setInterval(function () {
-    var btn = document.getElementById('ks-fontsize-btn')
-    if (!onArticlePage()) {
-      if (btn) btn.remove()
-      return
-    }
-    var input = findInput()
-    var n = input ? parseInt(input.value, 10) : NaN
-    if (isNaN(n) || n < 1 || n > 20) n = 17
-    var label = '字号：' + n
-    if (!btn) {
-      btn = document.createElement('button')
-      btn.id = 'ks-fontsize-btn'
-      btn.type = 'button'
-      btn.style.cssText =
-        'position:fixed;right:28px;bottom:28px;z-index:9999;padding:8px 18px;' +
-        'border-radius:999px;border:1px solid #d1d5db;background:#fff;color:#374151;' +
-        'font-size:13px;cursor:pointer'
-      btn.onclick = function () {
-        var input = findInput()
-        var v = prompt('正文字号（1-20，默认 16）：', String(current()))
-        if (v === null) return
-        var num = parseInt(v, 10)
-        if (isNaN(num) || num < 1 || num > 20) {
-          alert('请输入 1-20 之间的整数')
-          return
-        }
-        if (input) {
-          var setter = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, 'value').set
-          setter.call(input, String(num))
-          input.dispatchEvent(new Event('input', { bubbles: true }))
-        }
-        applyPreview(num)
-        alert('正文字号已设为 ' + num + '，记得点 Save 保存（或用 🚀 发布）')
-      }
-      document.body.appendChild(btn)
-    }
-    // 🚀 发布按钮也在右下角时，字号按钮上移避开
-    var pub = document.getElementById('ks-publish-btn')
-    btn.style.bottom = pub ? '88px' : '28px'
-    if (btn.textContent !== label) btn.textContent = label
-    if (lastShown !== String(n)) {
-      lastShown = String(n)
-      applyPreview(n)
-    }
-  }, 600)
-  function current() {
-    var input = findInput()
-    var n = input ? parseInt(input.value, 10) : NaN
-    if (isNaN(n) || n < 1 || n > 20) n = 17
-    return n
-  }
-})()`
-
 // 逐段字号（公众号式）：工具栏原「Paragraph」块类型下拉替换为「字号」下拉
-// （正文 + 1-20 号，号数即 px，与公众号一致）。光标所在段落选择字号后：
+// （正文 + 8-20px，菜单按公众号格式显示如「12px」）。光标所在段落选择字号后：
 //   1. 编辑区该段落立即应用字号（所见即所得）
 //   2. 写入隐藏的「段落字号」字段（JSON：{"段落序号":字号}），随 Save 保存
 // 博客前台由 layouts 里 data-para-sizes 脚本按同序号应用到正文段落；
@@ -601,8 +523,9 @@ const paragraphSizeScript = `(function () {
     function item(label, px, isBase) {
       var it = document.createElement('div')
       it.textContent = label
+      // 与公众号一致：菜单项按自身字号大小显示
       it.style.cssText =
-        'padding:7px 18px;cursor:pointer;font-size:' + (isBase ? 14 : Math.max(11, Math.min(20, px))) + 'px;' +
+        'padding:7px 18px;cursor:pointer;font-size:' + (isBase ? 14 : px) + 'px;' +
         'line-height:1.4;white-space:nowrap'
       it.onmouseenter = function () { it.style.background = '#f3f4f6' }
       it.onmouseleave = function () { it.style.background = '' }
@@ -610,7 +533,7 @@ const paragraphSizeScript = `(function () {
       menu.appendChild(it)
     }
     item('正文', BASE, true)
-    for (var n = 1; n <= 20; n++) item(String(n), n, false)
+    for (var n = 8; n <= 20; n++) item(n + 'px', n, false)
     document.body.appendChild(menu)
     positionMenu()
   }
@@ -641,13 +564,18 @@ const paragraphSizeScript = `(function () {
   }
   // ── 工具栏按钮 ──
   function ensureButton() {
-    var ed = document.querySelector('.mdxeditor')
-    if (!ed) return
-    var btns = ed.querySelectorAll('button')
+    // 编辑器工具栏容器：mdxeditor 根节点（兜底 role=toolbar 区域）
+    var containers = document.querySelectorAll('.mdxeditor, [role="toolbar"]')
+    if (!containers.length) return
     var target = null
-    for (var i = 0; i < btns.length; i++) {
-      var t = (btns[i].textContent || '').trim()
-      if (/^(Paragraph|Heading|Text)/.test(t)) { target = btns[i]; break }
+    for (var c = 0; c < containers.length && !target; c++) {
+      var btns = containers[c].querySelectorAll('button')
+      for (var i = 0; i < btns.length; i++) {
+        var b = btns[i]
+        var t = (b.textContent || '').trim()
+        var a = b.getAttribute('aria-label') || ''
+        if (/^(Paragraph|Heading|Text)/.test(t) || /Paragraph/i.test(a)) { target = b; break }
+      }
     }
     if (!target) return
     if (target.style.display !== 'none') target.style.display = 'none'
@@ -675,9 +603,9 @@ const paragraphSizeScript = `(function () {
   })
   document.addEventListener('selectionchange', function () {
     var btn = document.getElementById('ks-size-btn')
-    if (!btn) return
+    if (!btn || !btn.childNodes.length) return
     var idx = curBlockIndex()
-    if (idx >= 0 && map[idx]) btn.childNodes[0].nodeValue = '字号：' + map[idx]
+    if (idx >= 0 && map[idx]) btn.childNodes[0].nodeValue = map[idx] + 'px'
     else btn.childNodes[0].nodeValue = '字号'
   })
   // ── 轮询：应用已存字号 + 校验段落映射 ──
@@ -760,7 +688,6 @@ export default function KeystaticLayout() {
       <script dangerouslySetInnerHTML={{ __html: syncTitleScript }} />
       <script dangerouslySetInnerHTML={{ __html: publishButtonScript }} />
       <script dangerouslySetInnerHTML={{ __html: draftToggleScript }} />
-      <script dangerouslySetInnerHTML={{ __html: fontSizeButtonScript }} />
       <script dangerouslySetInnerHTML={{ __html: paragraphSizeScript }} />
       <script dangerouslySetInnerHTML={{ __html: mediaFolderScript }} />
       <script dangerouslySetInnerHTML={{ __html: raiseOverlayScript }} />

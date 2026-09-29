@@ -39,7 +39,8 @@ export default config({
           slug: { label: 'URL 路径（自动生成，可改）' },
         }),
         date: fields.date({ label: '发布日期', defaultValue: { kind: 'today' } }),
-        // 正文字号（1-20，博客前台真实生效）：面板隐藏后由右下角「字号」浮动按钮设置
+        // 正文字号（px，博客前台基础字号，缺省 17=公众号正文）。保留在 schema 里
+        // 是为了 Keystatic 保存时不抹掉已有文章的 fontSize 值（无 UI 入口）
         fontSize: fields.integer({ label: '正文字号（1-20）', defaultValue: 17 }),
         // 逐段字号（公众号式）：工具栏「字号」下拉按段落设置，JSON {"段落序号":字号} 自动维护
         paraSizes: fields.text({ label: '段落字号（自动）' }),
@@ -110,7 +111,8 @@ export default config({
           validation: { isRequired: true },
           defaultValue: { kind: 'today' },
         }),
-        // 正文字号（1-20，博客前台真实生效）：面板隐藏后由右下角「字号」浮动按钮设置
+        // 正文字号（px，博客前台基础字号，缺省 17=公众号正文）。保留在 schema 里
+        // 是为了 Keystatic 保存时不抹掉已有文章的 fontSize 值（无 UI 入口）
         fontSize: fields.integer({ label: '正文字号（1-20）', defaultValue: 17 }),
         // 逐段字号（公众号式）：工具栏「字号」下拉按段落设置，JSON {"段落序号":字号} 自动维护
         paraSizes: fields.text({ label: '段落字号（自动）' }),
